@@ -1,0 +1,39 @@
+# Production values for clinical-ai-prefect
+# Usage: helm install clinical-ai-prefect . -f values-production.yaml
+
+config:
+  storageEnvironment: "production"
+  aws:
+    region: "us-east-1"  # Update with your AWS region
+
+worker:
+  replicaCount: 3  # Scale up for production
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+
+server:
+  replicaCount: 1
+  # Run as root to fix UI build directory permission issues
+  runAsRoot: true
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+secrets:
+  aws:
+    useIamRole: false  # Set to true if using IRSA on EKS
+
+serviceAccount:
+  annotations: {}
+    # For IRSA on EKS, uncomment and configure:
+    # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/clinical-ai-prefect-worker
+

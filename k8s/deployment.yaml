@@ -1,0 +1,161 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clinical-ai-prefect-worker
+  namespace: clinical-ai
+  labels:
+    app: clinical-ai-prefect-worker
+    component: workflow-orchestration
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: clinical-ai-prefect-worker
+  template:
+    metadata:
+      labels:
+        app: clinical-ai-prefect-worker
+        component: workflow-orchestration
+    spec:
+      serviceAccountName: clinical-ai-prefect-worker
+      containers:
+      - name: prefect-worker
+        image: clinical-ai-prefect:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: PREFECT_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: clinical-ai-prefect-config
+              key: prefect-api-url
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: clinical-ai-prefect-secrets
+              key: database-url
+        # Storage Environment: "production" (AWS S3) or "development" (MinIO)
+        - name: STORAGE_ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: clinical-ai-prefect-config
+              key: storage-environment
+        # AWS S3 Configuration (Production)
+        # Credentials are injected from HashiCorp Vault via External Secrets Operator
+        # or Vault Agent Sidecar (see DEPLOYMENT.md for setup instructions)
+        - name: AWS_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: clinical-ai-prefect-config
+              key: aws-region
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: clinical-ai-aws-credentials
+              key: aws-access-key-id
+              optional: true  # Optional if using IAM roles or Vault injection
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: clinical-ai-aws-credentials
+              key: aws-secret-access-key
+              optional: true  # Optional if using IAM roles or Vault injection
+        # MinIO Configuration (Development Only)
+        # Only used when STORAGE_ENVIRONMENT=development
+        - name: MINIO_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: clinical-ai-prefect-config
+              key: minio-endpoint
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: clinical-ai-prefect-secrets
+              key: minio-access-key
+              optional: true  # Only needed for development
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: clinical-ai-prefect-secrets
+              key: minio-secret-key
+              optional: true  # Only needed for development
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        # Health checks removed - Prefect worker doesn't expose HTTP
+        # Use Prefect API health check if needed: curl ${PREFECT_API_URL%/api}/health
+        volumeMounts:
+        - name: prefect-cache
+          mountPath: /prefect/.prefect
+      volumes:
+      - name: prefect-cache
+        emptyDir: {}
+      restartPolicy: Always
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clinical-ai-prefect-server
+  namespace: clinical-ai
+  labels:
+    app: clinical-ai-prefect-server
+    component: workflow-orchestration
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clinical-ai-prefect-server
+  template:
+    metadata:
+      labels:
+        app: clinical-ai-prefect-server
+        component: workflow-orchestration
+    spec:
+      containers:
+      - name: prefect-server
+        image: prefecthq/prefect:2.14-python3.11
+        command: ["prefect", "server", "start", "--host", "0.0.0.0"]
+        ports:
+        - name: api
+          containerPort: 4200
+          protocol: TCP
+        env:
+        - name: PREFECT_API_DATABASE_CONNECTION_URL
+          valueFrom:
+            secretKeyRef:
+              name: clinical-ai-prefect-secrets
+              key: prefect-database-url
+        - name: PREFECT_API_DATABASE_ECHO
+          value: "false"
+        - name: PREFECT_API_DATABASE_SCHEMA
+          value: "prefect"
+        - name: PREFECT_SERVER_API_HOST
+          value: "0.0.0.0"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 4200
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 4200
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      restartPolicy: Always
+

@@ -1,0 +1,263 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+
+# Documentation
+README.md
+*.md
+!requirements.txt
+docs/
+*.rst
+LICENSE
+CHANGELOG.md
+CONTRIBUTING.md
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+*.code-workspace
+.project
+.classpath
+.settings/
+*.iml
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+cython_debug/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+.ENV/
+.env/
+env.bak/
+venv.bak/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+*.cover
+*.py,cover
+.cache
+nosetests.xml
+coverage.xml
+test/
+tests/
+*_test.py
+test_*.py
+
+# Logs
+*.log
+logs/
+*.log.*
+*.out
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+.tmp/
+temp/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+build/
+dist/
+*.whl
+*.tar.gz
+*.egg-info/
+*.egg
+
+# Helm charts (not needed in Docker image)
+helm/
+*.tgz
+charts/
+
+# Kubernetes manifests (not needed in Docker image)
+k8s/
+kubernetes/
+*.yaml
+*.yml
+!requirements.txt
+!Dockerfile
+!docker-compose.yml
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+Jenkinsfile
+azure-pipelines.yml
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.*
+!.env.example
+
+# Secrets (never include in Docker image!)
+secrets.yaml
+secrets.yml
+*.secret
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Local configuration
+local.yaml
+local.yml
+local-config.yaml
+local-config.yml
+config.local.*
+*.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+
+# Backup files
+*.backup
+*.bak
+*.old
+
+# Archive files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# Documentation builds
+docs/_build/
+docs/.doctrees/
+site/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Prefect local files
+.prefect/
+prefect.db
+.prefect/
+
+# Node modules (if any)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Docker
+Dockerfile.dev
+docker-compose*.yml
+.dockerignore
+
+# Deployment scripts (not needed in image)
+deploy/
+scripts/
+*.sh
+!setup*.sh
+
+# Helm
+helm/
+*.tgz
+charts/
+
+# Kubernetes
+k8s/
+kubernetes/
+*.kubeconfig
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+Jenkinsfile
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Secrets
+secrets.yaml
+secrets.yml
+*.secret
+*.key
+
+# Local config
+local.yaml
+local.yml
+*.local
+
+# Database
+*.db
+*.sqlite
+
+# Backup
+*.backup
+*.bak
+
+# Archive
+*.zip
+*.tar
+*.tar.gz
+
+# Docs
+docs/_build/
+site/
+
+# Prefect
+.prefect/
+prefect.db
+

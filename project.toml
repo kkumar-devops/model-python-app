@@ -1,0 +1,34 @@
+[project]
+name = "clinical-ai-prefect"
+description = "Prefect workflows for Clinical AI data ingestion and processing"
+version = "1.0.0"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.prefect]
+# Prefect project configuration
+name = "clinical-ai-prefect"
+description = "Clinical AI Data Ingestion Platform - Prefect Workflows"
+
+[tool.prefect.deployments]
+# Default deployment settings
+default_work_pool_name = "default"
+default_work_queue_name = "default"
+
+[tool.black]
+line-length = 120
+target-version = ['py311']
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+

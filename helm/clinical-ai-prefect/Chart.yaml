@@ -1,0 +1,17 @@
+apiVersion: v2
+name: clinical-ai-prefect
+description: A Helm chart for Clinical AI Prefect Workflows (Server and Worker)
+type: application
+version: 1.0.0
+appVersion: "2.14"
+keywords:
+  - prefect
+  - workflow
+  - orchestration
+  - data-ingestion
+maintainers:
+  - name: Clinical AI Team
+home: https://github.com/nphaseinc/clinical-ai-prefect
+sources:
+  - https://github.com/nphaseinc/clinical-ai-prefect
+

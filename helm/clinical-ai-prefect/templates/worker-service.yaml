@@ -1,0 +1,30 @@
+{{- if and .Values.worker.enabled .Values.worker.service.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "clinical-ai-prefect.fullname" . }}-worker
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "clinical-ai-prefect.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  type: {{ .Values.worker.service.type }}
+  {{- if .Values.worker.service.ports }}
+  ports:
+    {{- range .Values.worker.service.ports }}
+    - port: {{ .port }}
+      {{- if .targetPort }} 
+      targetPort: {{ .targetPort }}
+      {{- end }}
+      {{- if .name }}
+      name: {{ .name }}
+      {{- end }}
+      {{- if .protocol }}
+      protocol: {{ .protocol }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  selector:
+    {{- include "clinical-ai-prefect.worker.selectorLabels" . | nindent 4 }}
+{{- end }}
+

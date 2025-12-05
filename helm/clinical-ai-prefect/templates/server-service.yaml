@@ -1,0 +1,20 @@
+{{- if .Values.server.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "clinical-ai-prefect.fullname" . }}-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "clinical-ai-prefect.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  type: {{ .Values.server.service.type }}
+  ports:
+  - name: api
+    port: {{ .Values.server.service.port }}
+    targetPort: {{ .Values.server.service.targetPort }}
+    protocol: TCP
+  selector:
+    {{- include "clinical-ai-prefect.server.selectorLabels" . | nindent 4 }}
+{{- end }}
+

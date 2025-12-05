@@ -1,0 +1,128 @@
+name: Build and Deploy Clinical AI Prefect
+
+on:
+  push:
+    branches:
+      - main
+      - '*'
+      - '*/*'
+      - '**'
+  pull_request:
+    branches:
+      - '*'
+      - '*/*'
+      - '**'
+
+env:
+  REGISTRY: lms-dev2.redcapcloud.com
+  IMAGE_NAME: library/clinical-ai-prefect
+  IMAGE_REPOSITORY: lms-dev2.redcapcloud.com/library/clinical-ai-prefect
+  PUSH_BRANCH: main
+  RELEASE_NAME: ${{ vars.HELM_RELEASE || 'clinical-ai-prefect' }}
+  NAMESPACE: ${{ vars.K8S_NAMESPACE || 'devops-apps' }}
+  CHART_PATH: ${{ vars.HELM_CHART_PATH || 'helm/clinical-ai-prefect' }}
+  VALUES_FILE: ${{ vars.HELM_VALUES_FILE || 'helm/clinical-ai-prefect/values-production.yaml' }}
+
+jobs:
+  build:
+    name: Build container image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.set-image-tag.outputs.image_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine image tag
+        id: set-image-tag
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            IMAGE_TAG="${GITHUB_REF_NAME}"
+          else
+            REF_NAME="${GITHUB_REF_NAME:-${GITHUB_REF##*/}}"
+            IMAGE_TAG=$(echo "${REF_NAME}" | sed 's/[^a-zA-Z0-9_.-]/-/g')
+          fi
+          echo "Using IMAGE_TAG=${IMAGE_TAG}"
+          echo "image_tag=${IMAGE_TAG}" >> "${GITHUB_OUTPUT}"
+
+      - name: Decode Docker config and save
+        if: github.ref == format('refs/heads/{0}', env.PUSH_BRANCH) || startsWith(github.ref, 'refs/tags/')
+        run: |
+          if [ -z "${{ secrets.DOCKER_CONFIG_JSON }}" ]; then
+            echo "DOCKER_CONFIG_JSON secret is not defined." >&2
+            exit 1
+          fi
+          mkdir -p ~/.docker
+          echo "${{ secrets.DOCKER_CONFIG_JSON }}" | base64 -d > ~/.docker/config.json
+          chmod 600 ~/.docker/config.json
+
+      - name: Build container image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          tags: ${{ env.IMAGE_REPOSITORY }}:${{ steps.set-image-tag.outputs.image_tag }}
+          push: ${{ github.ref == format('refs/heads/{0}', env.PUSH_BRANCH) || startsWith(github.ref, 'refs/tags/') }}
+          load: ${{ github.ref != format('refs/heads/{0}', env.PUSH_BRANCH) && !startsWith(github.ref, 'refs/tags/') }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy with Helm
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.event_name != 'pull_request' || github.base_ref == 'main' || github.ref == 'refs/heads/main' }}
+    env:
+      IMAGE_TAG: ${{ needs.build.outputs.image_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
+        run: |
+          if [ -z "$KUBECONFIG_DATA" ]; then
+            echo "KUBECONFIG_DATA secret is not defined." >&2
+            exit 1
+          fi
+          mkdir -p ~/.kube
+          echo "$KUBECONFIG_DATA" | base64 -d > ~/.kube/config
+
+      - name: Helm dependency update
+        run: helm dependency update ${{ env.CHART_PATH }}
+
+      - name: Helm dry-run (feature branches)
+        if: github.ref != 'refs/heads/main'
+        run: |
+          helm upgrade --install ${{ env.RELEASE_NAME }} ${{ env.CHART_PATH }} \
+            --namespace ${{ env.NAMESPACE }} \
+            -f ${{ env.VALUES_FILE }} \
+            --set worker.image.repository=${{ env.IMAGE_REPOSITORY }} \
+            --set worker.image.tag=${{ env.IMAGE_TAG }} \
+            --set worker.podAnnotations.rollme=${{ github.run_id }}-${{ github.run_number }} \
+            --dry-run --debug
+
+      - name: Helm upgrade (main)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          helm upgrade --install ${{ env.RELEASE_NAME }} ${{ env.CHART_PATH }} \
+            --namespace ${{ env.NAMESPACE }} \
+            -f ${{ env.VALUES_FILE }} \
+            --set worker.image.repository=${{ env.IMAGE_REPOSITORY }} \
+            --set worker.image.tag=${{ env.IMAGE_TAG }} \
+            --set worker.podAnnotations.rollme=${{ github.run_id }}-${{ github.run_number }} \
+

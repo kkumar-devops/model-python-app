@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: clinical-ai-prefect-worker
+  namespace: clinical-ai
+  labels:
+    app: clinical-ai-prefect-worker
+    component: workflow-orchestration
+spec:
+  type: ClusterIP
+  # Flow Server port removed - manual triggers now use Prefect API
+  # No ports exposed for worker (Prefect worker doesn't expose HTTP)
+  selector:
+    app: clinical-ai-prefect-worker
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: clinical-ai-prefect-server
+  namespace: clinical-ai
+  labels:
+    app: clinical-ai-prefect-server
+    component: workflow-orchestration
+spec:
+  type: ClusterIP
+  ports:
+  - name: api
+    port: 4200
+    targetPort: 4200
+    protocol: TCP
+  selector:
+    app: clinical-ai-prefect-server
+

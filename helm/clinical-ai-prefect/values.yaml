@@ -1,0 +1,225 @@
+# Default values for clinical-ai-prefect
+# This is a YAML-formatted file.
+
+# Global settings
+global:
+  namespace: clinical-ai
+
+# Prefect Server configuration
+server:
+  enabled: true
+  image:
+    repository: prefecthq/prefect
+    tag: "2.14-python3.11"
+    pullPolicy: IfNotPresent
+  
+  replicaCount: 1
+  
+  service:
+    type: ClusterIP
+    port: 4200
+    targetPort: 4200
+  ingress:
+    enabled: false
+    className: ""  # e.g., "nginx", "traefik"
+    annotations: {}
+      # kubernetes.io/ingress.class: nginx
+      # cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: prefect.example.com
+        path: /
+        pathType: Prefix
+    tls: []
+      # - secretName: prefect-tls
+      #   hosts:
+      #     - prefect.example.com
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  
+  # Prefect Server environment variables
+  env:
+    databaseEcho: "false"
+    databaseSchema: "prefect"
+    apiHost: "0.0.0.0"
+  
+  # Run server as root to fix UI build directory permission issues
+  # Set to true if you encounter PermissionError when starting the server
+  runAsRoot: false
+  
+  # Health check configuration
+  livenessProbe:
+    enabled: true
+    path: /api/health
+    port: 4200
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 10
+    failureThreshold: 3
+  
+  readinessProbe:
+    enabled: true
+    path: /api/health
+    port: 4200
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+# Prefect Worker configuration
+worker:
+  enabled: true
+  image:
+    repository: lms-dev2.redcapcloud.com/library/clinical-ai-prefect
+    tag: "main"
+    pullPolicy: Always
+  imagePullSecrets:
+    - name: rcc-quay
+  
+  replicaCount: 2
+  
+  service:
+    enabled: false
+    type: ClusterIP
+    ports: []
+    # Flow Server ports removed - manual triggers now use Prefect API
+    # No ports needed for worker (Prefect worker doesn't expose HTTP)
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+  
+  # Health checks removed - Prefect worker doesn't expose HTTP
+  # Use Prefect API health check if needed: curl ${PREFECT_API_URL%/api}/health
+  livenessProbe:
+    enabled: false
+  readinessProbe:
+    enabled: false
+  
+  # Pod annotations - can be set via CI/CD to force pod restarts
+  podAnnotations: {}
+
+# Configuration
+config:
+  # Storage environment: "production" (AWS S3) or "development" (MinIO)
+  storageEnvironment: "production"
+  
+  # AWS S3 Configuration (Production)
+  aws:
+    region: "us-east-1"
+  
+  # MinIO Configuration (Development Only)
+  minio:
+    endpoint: "http://minio.clinical-ai.svc.cluster.local:9000"
+  
+  # Prefect API URL (auto-generated if not specified)
+  prefectApiUrl: ""  # If empty, will be generated as http://{{ .Release.Name }}-server.{{ .Release.Namespace }}.svc.cluster.local:4200/api
+  
+
+config:
+  storageEnvironment: "production"
+
+secrets:
+  database:
+    name: clinical-ai-prefect-secrets
+    keys:
+      databaseUrl: "database-url"
+      prefectDatabaseUrl: "prefect-database-url"
+      minioAccessKey: "minio-access-key"
+      minioSecretKey: "minio-secret-key"
+    data:
+      database-url: ""
+      prefect-database-url: ""
+      minio-access-key: ""
+      minio-secret-key: ""
+
+  aws:
+    name: clinical-ai-aws-credentials
+    keys:
+      accessKeyId: "aws-access-key-id"
+      secretAccessKey: "aws-secret-access-key"
+    useIamRole: false
+
+# Service Account
+serviceAccount:
+  create: true
+  name: clinical-ai-prefect-worker
+  annotations: {}
+    # For IRSA on EKS:
+    # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/ROLE_NAME
+
+# Labels and annotations
+labels: {}
+  # Add custom labels here
+
+annotations: {}
+  # Add custom annotations here
+
+# Pod security context
+podSecurityContext:
+  runAsUser: 5002
+  runAsGroup: 5000
+  fsGroup: 5000
+  fsGroupChangePolicy: "OnRootMismatch"
+
+# Security context for containers
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 5002
+  runAsGroup: 5000
+  capabilities:
+    drop:
+    - ALL
+
+# Volumes
+volumes:
+  prefectCache:
+    enabled: true
+    type: emptyDir
+    # For persistent storage, use:
+    # type: persistentVolumeClaim
+    # persistentVolumeClaim:
+    #   claimName: prefect-cache-pvc
+
+# Node selector, tolerations, and affinity
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# External Secrets Operator integration
+externalSecrets:
+  enabled: true
+  # Refresh interval for syncing secrets from Vault
+  refreshInterval: "60s"
+  # Create a dedicated SecretStore for Prefect (uses clinical-ai-prefect role)
+  # Set to false to use existing ClusterSecretStore (vault-rcc)
+  createSecretStore: true
+  # Name of the ClusterSecretStore to use if createSecretStore is false
+  clusterSecretStore: "vault-rcc"
+  vault:
+    # Vault server URL
+    server: "https://cai-vault.redcapcloud.com"
+    # KV secrets engine path (usually "secret")
+    path: "secret"
+    # KV version: "v1" or "v2"
+    version: "v2"
+    # Vault path where secrets are stored
+    # Full path: secret/kubernetes/mgt-nv-eks/clinical-ai-prefect
+    secretPath: "secret/kubernetes/mgt-nv-eks/clinical-ai-prefect"
+    auth:
+      # Kubernetes auth mount path
+      mountPath: "kubernetes"
+      # Vault role name (should match the role created in Vault)
+      role: "clinical-ai-prefect"
+

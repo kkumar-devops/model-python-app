@@ -1,0 +1,95 @@
+{{- if .Values.server.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "clinical-ai-prefect.fullname" . }}-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "clinical-ai-prefect.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  replicas: {{ .Values.server.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "clinical-ai-prefect.server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "clinical-ai-prefect.server.selectorLabels" . | nindent 8 }}
+      {{- with .Values.annotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: prefect-server
+        {{- if .Values.server.runAsRoot }}
+        securityContext:
+          runAsUser: 0
+        {{- else }}
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- end }}
+        image: "{{ .Values.server.image.repository }}:{{ .Values.server.image.tag }}"
+        imagePullPolicy: {{ .Values.server.image.pullPolicy }}
+        command: ["prefect", "server", "start", "--host", "0.0.0.0"]
+        ports:
+        - name: api
+          containerPort: {{ .Values.server.service.targetPort }}
+          protocol: TCP
+        env:
+        - name: PREFECT_API_DATABASE_CONNECTION_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.database.name }}
+              key: {{ .Values.secrets.database.keys.prefectDatabaseUrl }}
+        - name: PREFECT_API_DATABASE_ECHO
+          value: {{ .Values.server.env.databaseEcho | quote }}
+        - name: PREFECT_API_DATABASE_SCHEMA
+          value: {{ .Values.server.env.databaseSchema | quote }}
+        - name: PREFECT_SERVER_API_HOST
+          value: {{ .Values.server.env.apiHost | quote }}
+        {{- with .Values.server.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- if .Values.server.livenessProbe.enabled }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.server.livenessProbe.path }}
+            port: {{ .Values.server.livenessProbe.port }}
+          initialDelaySeconds: {{ .Values.server.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.server.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.server.livenessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.server.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.server.readinessProbe.enabled }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.server.readinessProbe.path }}
+            port: {{ .Values.server.readinessProbe.port }}
+          initialDelaySeconds: {{ .Values.server.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.server.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.server.readinessProbe.timeoutSeconds }}
+          failureThreshold: {{ .Values.server.readinessProbe.failureThreshold }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+

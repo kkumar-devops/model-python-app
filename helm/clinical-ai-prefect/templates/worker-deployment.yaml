@@ -1,0 +1,143 @@
+{{- if .Values.worker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "clinical-ai-prefect.fullname" . }}-worker
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "clinical-ai-prefect.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "clinical-ai-prefect.worker.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "clinical-ai-prefect.worker.selectorLabels" . | nindent 8 }}
+      annotations:
+        {{- with .Values.annotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with .Values.worker.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- end }}
+      {{- with .Values.worker.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: prefect-worker
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+        imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+        # Flow Server port removed - manual triggers now use Prefect API
+        env:
+        - name: PREFECT_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "clinical-ai-prefect.configMapName" . }}
+              key: prefect-api-url
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.database.name }}
+              key: {{ .Values.secrets.database.keys.databaseUrl }}
+        - name: STORAGE_ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "clinical-ai-prefect.configMapName" . }}
+              key: storage-environment
+        {{- if eq .Values.config.storageEnvironment "production" }}
+        - name: AWS_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "clinical-ai-prefect.configMapName" . }}
+              key: aws-region
+        {{- if not .Values.secrets.aws.useIamRole }}
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.aws.name }}
+              key: {{ .Values.secrets.aws.keys.accessKeyId }}
+              optional: true
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.aws.name }}
+              key: {{ .Values.secrets.aws.keys.secretAccessKey }}
+              optional: true
+        {{- end }}
+        {{- else }}
+        - name: MINIO_ENDPOINT
+          valueFrom:
+            configMapKeyRef:
+              name: {{ include "clinical-ai-prefect.configMapName" . }}
+              key: minio-endpoint
+        - name: MINIO_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.database.name }}
+              key: {{ .Values.secrets.database.keys.minioAccessKey }}
+              optional: true
+        - name: MINIO_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.secrets.database.name }}
+              key: {{ .Values.secrets.database.keys.minioSecretKey }}
+              optional: true
+        {{- end }}
+        # FLOW_SERVER_PORT removed - manual triggers now use Prefect API
+        {{- with .Values.worker.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        # Health checks removed - Prefect worker doesn't expose HTTP
+        # Use Prefect API health check if needed: curl ${PREFECT_API_URL%/api}/health
+        volumeMounts:
+        {{- if .Values.volumes.prefectCache.enabled }}
+        - name: prefect-cache
+          mountPath: /prefect/.prefect
+        {{- end }}
+        - name: env-volume
+          mountPath: /mnt/env
+          readOnly: false
+      volumes:
+      {{- if .Values.volumes.prefectCache.enabled }}
+      - name: prefect-cache
+        {{- if eq .Values.volumes.prefectCache.type "emptyDir" }}
+        emptyDir: {}
+        {{- else if eq .Values.volumes.prefectCache.type "persistentVolumeClaim" }}
+        persistentVolumeClaim:
+          claimName: {{ .Values.volumes.prefectCache.persistentVolumeClaim.claimName }}
+        {{- end }}
+      {{- end }}
+      - name: env-volume
+        persistentVolumeClaim:
+          claimName: mnt-main-env-pvc
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+

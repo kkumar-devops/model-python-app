@@ -1,0 +1,33 @@
+# Example: Vault Agent Sidecar Injection
+# Alternative approach to External Secrets Operator
+# This injects Vault Agent as a sidecar container that syncs secrets to a shared volume
+#
+# To use this approach:
+# 1. Install Vault Agent Injector in your cluster
+# 2. Add annotations to the deployment pod template
+# 3. Secrets will be available at /vault/secrets/aws-credentials
+
+# Add these annotations to the deployment pod template:
+# annotations:
+#   vault.hashicorp.com/agent-inject: "true"
+#   vault.hashicorp.com/role: "clinical-ai-prefect"
+#   vault.hashicorp.com/agent-inject-secret-aws-credentials: "secret/data/clinical-ai/aws"
+#   vault.hashicorp.com/agent-inject-template-aws-credentials: |
+#     {{- with secret "secret/data/clinical-ai/aws" -}}
+#     AWS_ACCESS_KEY_ID={{ .Data.data.aws_access_key_id }}
+#     AWS_SECRET_ACCESS_KEY={{ .Data.data.aws_secret_access_key }}
+#     {{- end }}
+#   vault.hashicorp.com/agent-inject-file-aws-credentials: "/vault/secrets/aws-credentials"
+#
+# Then update the deployment to source environment variables from the file:
+# env:
+# - name: AWS_ACCESS_KEY_ID
+#   valueFrom:
+#     secretKeyRef:
+#       name: vault-aws-credentials
+#       key: AWS_ACCESS_KEY_ID
+#
+# Or use a startup script to read from /vault/secrets/aws-credentials
+
+# This is just an example - actual implementation depends on your Vault setup
+

@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clinical-ai-prefect-config
+  namespace: clinical-ai
+  labels:
+    app: clinical-ai-prefect
+    component: workflow-orchestration
+data:
+  # Prefect Server API URL
+  # Update this to match your Prefect Server service name and namespace
+  prefect-api-url: "http://clinical-ai-prefect-server.clinical-ai.svc.cluster.local:4200/api"
+  
+  # Flow Server removed - manual triggers now use Prefect API
+  
+  # ============================================
+  # STORAGE CONFIGURATION
+  # ============================================
+  # Environment: "production" or "development"
+  # In production, set to "production" to use AWS S3
+  # In development, set to "development" to use MinIO
+  storage-environment: "production"
+  
+  # AWS S3 Configuration (Production)
+  # AWS S3 bucket names are configured in connector definitions in the database
+  # AWS credentials are retrieved from HashiCorp Vault (see deployment.yaml)
+  aws-region: "us-east-1"
+  
+  # MinIO Configuration (Development Only)
+  # Only used when storage-environment is "development"
+  minio-endpoint: "http://minio.clinical-ai.svc.cluster.local:9000"
+
